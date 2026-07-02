@@ -1,2 +1,5 @@
 fastapi[standard]
 pytest
+transformers
+torch
+sentencepiece
