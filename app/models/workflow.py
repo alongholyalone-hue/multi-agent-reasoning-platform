@@ -92,6 +92,34 @@ class ReviewResult(BaseModel):
     )
 
 
+class FinalAnswer(BaseModel):
+    """The final response produced after review."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    content: str = Field(
+        min_length=1,
+        description="The finalized answer returned to the user.",
+    )
+
+    approved: bool = Field(
+        description="Whether the reviewer approved the final draft.",
+    )
+
+    revision_number: int = Field(
+        ge=0,
+        description="The revision number of the finalized draft.",
+    )
+
+    unresolved_issues: list[str] = Field(
+        default_factory=list,
+        description="Review issues that remain unresolved.",
+    )
+
+
 class AgentEvent(BaseModel):
     """One traceable event produced during workflow execution."""
 
