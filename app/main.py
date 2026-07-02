@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from app.api import tasks_router
+
 
 app = FastAPI(
     title="Multi-Agent Reasoning Platform",
@@ -7,8 +9,10 @@ app = FastAPI(
         "A traceable multi-agent platform for planning, solving, "
         "reviewing, and revising technical problems."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
+
+app.include_router(tasks_router)
 
 
 @app.get("/health")
