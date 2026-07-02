@@ -2,6 +2,7 @@ import pytest
 
 from app.agents import SolverAgent
 from app.models import DraftAnswer, Plan
+from app.providers import DeterministicModelProvider
 
 
 def create_test_plan(
@@ -117,3 +118,87 @@ def test_solver_rejects_negative_revision_number() -> None:
             plan=plan,
             revision_number=-1,
         )
+
+
+def test_solver_uses_provider_generated_content() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            "Orbital velocity decreases as orbital radius "
+            "increases because the required centripetal speed "
+            "becomes lower farther from the central mass."
+        )
+    )
+
+    solver = SolverAgent(provider=provider)
+    plan = create_test_plan()
+
+    draft = solver.run(
+        question=(
+            "Why does orbital velocity decrease "
+            "as radius increases?"
+        ),
+        plan=plan,
+    )
+
+    assert draft.content == (
+        "Orbital velocity decreases as orbital radius "
+        "increases because the required centripetal speed "
+        "becomes lower farther from the central mass."
+    )
+    assert len(provider.calls) == 1
+
+
+def test_solver_sends_question_and_plan_to_provider() -> None:
+    provider = DeterministicModelProvider(
+        response="A complete generated answer."
+    )
+
+    solver = SolverAgent(provider=provider)
+    plan = create_test_plan()
+
+    solver.run(
+        question="Explain orbital velocity.",
+        plan=plan,
+    )
+
+    call = provider.calls[0]
+
+    assert "Explain orbital velocity." in call.user_prompt
+    assert plan.objective in call.user_prompt
+
+    for step in plan.steps:
+        assert step in call.user_prompt
+
+
+def test_solver_sends_tools_and_revision_instructions() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            "The revised answer uses a calculator and "
+            "includes the governing equation."
+        )
+    )
+
+    solver = SolverAgent(provider=provider)
+
+    plan = create_test_plan(
+        required_tools=["calculator"]
+    )
+
+    draft = solver.run(
+        question="Calculate orbital velocity.",
+        plan=plan,
+        revision_instructions=[
+            "Include the governing equation.",
+        ],
+        revision_number=1,
+    )
+
+    call = provider.calls[0]
+
+    assert "calculator" in call.user_prompt
+    assert (
+        "Include the governing equation."
+        in call.user_prompt
+    )
+    assert "Revision number:\n1" in call.user_prompt
+    assert draft.revision_number == 1
