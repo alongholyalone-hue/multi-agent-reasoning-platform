@@ -36,6 +36,41 @@ class Plan(BaseModel):
     )
 
 
+class DraftAnswer(BaseModel):
+    """A structured draft produced by the solver agent."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    content: str = Field(
+        min_length=1,
+        description="The solver's current draft answer.",
+    )
+
+    reasoning_steps: list[str] = Field(
+        min_length=1,
+        description="The reasoning steps used to produce the draft.",
+    )
+
+    requested_tools: list[str] = Field(
+        default_factory=list,
+        description="Tools requested by the plan.",
+    )
+
+    applied_revision_instructions: list[str] = Field(
+        default_factory=list,
+        description="Reviewer instructions applied to this draft.",
+    )
+
+    revision_number: int = Field(
+        default=0,
+        ge=0,
+        description="The revision number of this draft.",
+    )
+
+
 class ReviewResult(BaseModel):
     """The reviewer agent's evaluation of a draft answer."""
 
