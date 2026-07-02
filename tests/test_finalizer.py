@@ -47,7 +47,7 @@ def test_finalizer_returns_approved_final_answer() -> None:
     assert answer.approved is True
     assert answer.unresolved_issues == []
     assert answer.content.startswith(
-        "Final answer for: Explain orbital velocity."
+    "Final answer for: Explain orbital velocity."
     )
     assert "Draft answer for:" not in answer.content
 
@@ -77,7 +77,7 @@ def test_finalizer_preserves_unresolved_issues() -> None:
         "The answer needs a governing equation.",
     ]
     assert answer.content.startswith(
-        "Best available answer for: "
+        "Unable to provide a reliable answer for: "
         "Explain orbital velocity."
     )
 

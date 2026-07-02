@@ -81,14 +81,14 @@ class SolverAgent:
 
     @staticmethod
     def _build_system_prompt() -> str:
-        """Return the solver's role and response requirements."""
+        """Return concise instructions for answer generation."""
 
         return (
-            "You are the solver agent in a multi-agent reasoning "
-            "workflow. Produce a complete, accurate, and clearly "
-            "structured answer to the user's question. Follow the "
-            "planner's steps and any reviewer instructions. Do not "
-            "include unfinished placeholders."
+            "Answer the technical question accurately and directly. "
+            "Write one coherent paragraph using several complete sentences. "
+            "Explain the cause or mechanism instead of stating only the "
+            "conclusion. Do not use headings, numbered lists, bullet points, "
+            "or unfinished placeholders."
         )
 
     @staticmethod
@@ -99,40 +99,31 @@ class SolverAgent:
         revision_instructions: list[str],
         revision_number: int,
     ) -> str:
-        """Build the structured prompt sent to a model provider."""
+        """Build a compact prompt for the local instruction model."""
 
-        plan_steps = "\n".join(
-            f"{index}. {step}"
-            for index, step in enumerate(
-                plan.steps,
-                start=1,
-            )
-        )
+        guidance = " ".join(plan.steps)
 
-        required_tools = (
-            ", ".join(plan.required_tools)
-            if plan.required_tools
-            else "None"
-        )
-
-        instructions = (
-            "\n".join(
-                f"- {instruction}"
-                for instruction in revision_instructions
-            )
+        feedback = (
+            " ".join(revision_instructions)
             if revision_instructions
-            else "None"
+            else "No reviewer feedback."
+        )
+
+        tool_guidance = (
+            "Available tools: "
+            + ", ".join(plan.required_tools)
+            + "."
+            if plan.required_tools
+            else ""
         )
 
         return (
-            f"Question:\n{question}\n\n"
-            f"Objective:\n{plan.objective}\n\n"
-            f"Plan:\n{plan_steps}\n\n"
-            f"Required tools:\n{required_tools}\n\n"
-            f"Revision number:\n{revision_number}\n\n"
-            f"Reviewer instructions:\n{instructions}\n\n"
-            "Return only the complete draft answer."
-        )
+            f"Question: {question}\n\n"
+            f"Reasoning guidance: {guidance}\n\n"
+            f"Reviewer feedback: {feedback}\n\n"
+            f"{tool_guidance}\n\n"
+            "Provide the complete explanatory answer now."
+        )   
 
     @staticmethod
     def _build_deterministic_content(

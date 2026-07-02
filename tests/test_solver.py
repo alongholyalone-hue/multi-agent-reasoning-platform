@@ -164,7 +164,7 @@ def test_solver_sends_question_and_plan_to_provider() -> None:
     call = provider.calls[0]
 
     assert "Explain orbital velocity." in call.user_prompt
-    assert plan.objective in call.user_prompt
+    assert "Reasoning guidance:" in call.user_prompt
 
     for step in plan.steps:
         assert step in call.user_prompt
@@ -200,5 +200,5 @@ def test_solver_sends_tools_and_revision_instructions() -> None:
         "Include the governing equation."
         in call.user_prompt
     )
-    assert "Revision number:\n1" in call.user_prompt
+    assert "Reviewer feedback:" in call.user_prompt
     assert draft.revision_number == 1

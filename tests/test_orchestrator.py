@@ -172,7 +172,7 @@ def test_orchestrator_respects_zero_revision_limit() -> None:
     assert result.revision_count == 0
     assert len(result.events) == 4
     assert result.final_answer.startswith(
-        "Best available answer for:"
+        "Unable to provide a reliable answer for:"
     )
 
 

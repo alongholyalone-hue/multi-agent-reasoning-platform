@@ -33,11 +33,17 @@ class FinalizerAgent:
             )
             unresolved_issues: list[str] = []
         else:
-            heading = (
-                f"Best available answer for: "
-                f"{cleaned_question}"
-            )
-            unresolved_issues = list(review.issues)
+            return FinalAnswer(
+                content=(
+                "Unable to provide a reliable answer for: "
+                f"{cleaned_question}\n\n"
+                "The local model did not produce an answer that passed "
+                "review within the allowed revision limit."
+            ),
+            approved=False,
+            revision_number=draft.revision_number,
+            unresolved_issues=list(review.issues),
+        )
 
         return FinalAnswer(
             content=f"{heading}\n\n{cleaned_draft}",

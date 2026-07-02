@@ -88,11 +88,20 @@ class HuggingFaceText2TextProvider:
                 for name, tensor in model_inputs.items()
             }
 
+        minimum_tokens = min(
+            24,
+            self.max_new_tokens,
+        )
+
         with torch.inference_mode():
             output_ids = model.generate(
                 **model_inputs,
                 max_new_tokens=self.max_new_tokens,
+                min_new_tokens=minimum_tokens,
+                num_beams=4,
                 do_sample=False,
+                early_stopping=True,
+                no_repeat_ngram_size=3,
             )
 
         generated_text = tokenizer.decode(

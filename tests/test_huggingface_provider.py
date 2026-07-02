@@ -235,7 +235,11 @@ def test_huggingface_provider_uses_generation_settings() -> None:
     generation_call = model.generate_calls[0]
 
     assert generation_call["max_new_tokens"] == 128
+    assert generation_call["min_new_tokens"] == 24
+    assert generation_call["num_beams"] == 4
     assert generation_call["do_sample"] is False
+    assert generation_call["early_stopping"] is True
+    assert generation_call["no_repeat_ngram_size"] == 3
 
     assert tokenizer.last_batch is not None
     assert tokenizer.last_batch.device == "cpu"
