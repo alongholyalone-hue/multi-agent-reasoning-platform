@@ -1,24 +1,28 @@
 from collections.abc import Callable
 from typing import Any
 
+import torch
+
 
 DEFAULT_MODEL_NAME = "google/flan-t5-small"
 
 
 class HuggingFaceText2TextProvider:
     """
-    Generate responses using a local Hugging Face text-to-text model.
+    Generate responses using a local Hugging Face sequence-to-sequence model.
 
-    The model is loaded lazily during the first generation request so
-    importing the application does not immediately download or load it.
+    The tokenizer and model are loaded lazily during the first generation
+    request so importing the application does not immediately download
+    or load the model.
     """
 
     def __init__(
         self,
         model_name: str = DEFAULT_MODEL_NAME,
         max_new_tokens: int = 256,
-        device: int = -1,
-        pipeline_factory: Callable[..., Any] | None = None,
+        device: int | str = -1,
+        tokenizer_factory: Callable[[str], Any] | None = None,
+        model_factory: Callable[[str], Any] | None = None,
     ) -> None:
         cleaned_model_name = model_name.strip()
 
@@ -32,9 +36,13 @@ class HuggingFaceText2TextProvider:
 
         self.model_name = cleaned_model_name
         self.max_new_tokens = max_new_tokens
-        self.device = device
-        self._pipeline_factory = pipeline_factory
-        self._generator: Any | None = None
+        self.device = self._resolve_device(device)
+
+        self._tokenizer_factory = tokenizer_factory
+        self._model_factory = model_factory
+
+        self._tokenizer: Any | None = None
+        self._model: Any | None = None
 
     def generate(
         self,
@@ -42,7 +50,7 @@ class HuggingFaceText2TextProvider:
         system_prompt: str,
         user_prompt: str,
     ) -> str:
-        """Generate a response from the local model."""
+        """Generate a response using the local model."""
 
         cleaned_system_prompt = system_prompt.strip()
         cleaned_user_prompt = user_prompt.strip()
@@ -57,7 +65,7 @@ class HuggingFaceText2TextProvider:
                 "user_prompt cannot be empty"
             )
 
-        generator = self._get_generator()
+        tokenizer, model = self._get_components()
 
         combined_prompt = (
             "Instruction:\n"
@@ -66,15 +74,31 @@ class HuggingFaceText2TextProvider:
             f"{cleaned_user_prompt}"
         )
 
-        outputs = generator(
+        model_inputs = tokenizer(
             combined_prompt,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=False,
+            return_tensors="pt",
+            truncation=True,
         )
 
-        generated_text = self._extract_generated_text(
-            outputs
-        )
+        if hasattr(model_inputs, "to"):
+            model_inputs = model_inputs.to(self.device)
+        else:
+            model_inputs = {
+                name: tensor.to(self.device)
+                for name, tensor in model_inputs.items()
+            }
+
+        with torch.inference_mode():
+            output_ids = model.generate(
+                **model_inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+            )
+
+        generated_text = tokenizer.decode(
+            output_ids[0],
+            skip_special_tokens=True,
+        ).strip()
 
         if not generated_text:
             raise RuntimeError(
@@ -83,52 +107,62 @@ class HuggingFaceText2TextProvider:
 
         return generated_text
 
-    def _get_generator(self) -> Any:
-        """Load the Hugging Face pipeline only when first needed."""
+    def _get_components(self) -> tuple[Any, Any]:
+        """Load and cache the tokenizer and model."""
 
-        if self._generator is not None:
-            return self._generator
+        if (
+            self._tokenizer is not None
+            and self._model is not None
+        ):
+            return self._tokenizer, self._model
 
-        pipeline_factory = self._pipeline_factory
+        tokenizer_factory = self._tokenizer_factory
+        model_factory = self._model_factory
 
-        if pipeline_factory is None:
-            from transformers import pipeline
+        if tokenizer_factory is None or model_factory is None:
+            from transformers import (
+                AutoModelForSeq2SeqLM,
+                AutoTokenizer,
+            )
 
-            pipeline_factory = pipeline
+            tokenizer_factory = (
+                tokenizer_factory
+                or AutoTokenizer.from_pretrained
+            )
 
-        self._generator = pipeline_factory(
-            task="text2text-generation",
-            model=self.model_name,
-            device=self.device,
+            model_factory = (
+                model_factory
+                or AutoModelForSeq2SeqLM.from_pretrained
+            )
+
+        self._tokenizer = tokenizer_factory(
+            self.model_name
         )
 
-        return self._generator
+        self._model = model_factory(
+            self.model_name
+        )
+
+        self._model.to(self.device)
+        self._model.eval()
+
+        return self._tokenizer, self._model
 
     @staticmethod
-    def _extract_generated_text(
-        outputs: Any,
+    def _resolve_device(
+        device: int | str,
     ) -> str:
-        """Validate and extract generated text from pipeline output."""
+        """Convert pipeline-style device settings into torch devices."""
 
-        if not isinstance(outputs, list) or not outputs:
-            raise RuntimeError(
-                "local model returned an invalid response"
-            )
+        if isinstance(device, int):
+            if device < 0:
+                return "cpu"
 
-        first_output = outputs[0]
+            return f"cuda:{device}"
 
-        if not isinstance(first_output, dict):
-            raise RuntimeError(
-                "local model returned an invalid response"
-            )
+        cleaned_device = device.strip()
 
-        generated_text = first_output.get(
-            "generated_text"
-        )
+        if not cleaned_device:
+            raise ValueError("device cannot be empty")
 
-        if not isinstance(generated_text, str):
-            raise RuntimeError(
-                "local model response did not contain generated_text"
-            )
-
-        return generated_text.strip()
+        return cleaned_device
