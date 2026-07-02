@@ -1,6 +1,28 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.api.tasks import get_orchestrator
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def use_scaffold_provider(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """
+    Keep API unit tests deterministic regardless of shell configuration.
+    """
+
+    monkeypatch.setenv(
+        "MODEL_PROVIDER",
+        "scaffold",
+    )
+
+    get_orchestrator.cache_clear()
+
+    yield
+
+    get_orchestrator.cache_clear()
 
 
 client = TestClient(app)
