@@ -1,6 +1,7 @@
 import pytest
 
 from app.providers import (
+    HuggingFaceCausalProvider,
     HuggingFaceText2TextProvider,
     create_model_provider,
 )
@@ -30,18 +31,29 @@ def test_provider_factory_creates_huggingface_provider() -> None:
     )
 
 
-def test_provider_factory_normalizes_mode() -> None:
+def test_provider_factory_creates_causal_provider() -> None:
     provider = create_model_provider(
-        mode="  HUGGINGFACE  "
+        mode="causal"
     )
 
     assert isinstance(
         provider,
-        HuggingFaceText2TextProvider,
+        HuggingFaceCausalProvider,
     )
 
 
-def test_provider_factory_reads_environment_settings(
+def test_provider_factory_normalizes_mode() -> None:
+    provider = create_model_provider(
+        mode="  CAUSAL  "
+    )
+
+    assert isinstance(
+        provider,
+        HuggingFaceCausalProvider,
+    )
+
+
+def test_provider_factory_reads_huggingface_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(
@@ -50,7 +62,7 @@ def test_provider_factory_reads_environment_settings(
     )
     monkeypatch.setenv(
         "HF_MODEL_NAME",
-        "custom-test-model",
+        "custom-text-model",
     )
     monkeypatch.setenv(
         "HF_MAX_NEW_TOKENS",
@@ -67,18 +79,46 @@ def test_provider_factory_reads_environment_settings(
         provider,
         HuggingFaceText2TextProvider,
     )
-    assert provider.model_name == "custom-test-model"
+    assert provider.model_name == "custom-text-model"
     assert provider.max_new_tokens == 77
+    assert provider.device == "cpu"
+
+
+def test_provider_factory_reads_causal_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "MODEL_PROVIDER",
+        "causal",
+    )
+    monkeypatch.setenv(
+        "CAUSAL_MODEL_NAME",
+        "custom-causal-model",
+    )
+    monkeypatch.setenv(
+        "CAUSAL_MAX_NEW_TOKENS",
+        "96",
+    )
+    monkeypatch.setenv(
+        "CAUSAL_DEVICE",
+        "cpu",
+    )
+
+    provider = create_model_provider()
+
+    assert isinstance(
+        provider,
+        HuggingFaceCausalProvider,
+    )
+    assert provider.model_name == "custom-causal-model"
+    assert provider.max_new_tokens == 96
     assert provider.device == "cpu"
 
 
 def test_provider_factory_rejects_unknown_mode() -> None:
     with pytest.raises(
         ValueError,
-        match=(
-            "MODEL_PROVIDER must be either "
-            "'scaffold' or 'huggingface'"
-        ),
+        match="MODEL_PROVIDER must be one of",
     ):
         create_model_provider(
             mode="unknown"
