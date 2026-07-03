@@ -7,11 +7,12 @@ from app.models import DraftAnswer, ReviewResult
 def create_complete_draft() -> DraftAnswer:
     return DraftAnswer(
         content=(
-            "Draft answer for: Explain orbital velocity.\n\n"
-            "The answer identifies the relevant orbital equation, "
-            "explains the relationship between orbital radius and "
-            "velocity, and provides a clear conclusion based on the "
-            "reasoning steps below."
+            "Orbital velocity is determined by the balance between "
+            "gravity and circular motion. For a circular orbit, the "
+            "relationship v = sqrt(GM / r) shows that increasing the "
+            "orbital radius increases the denominator and lowers the "
+            "required velocity. Therefore, an object farther from the "
+            "same central mass moves more slowly in its circular orbit."
         ),
         reasoning_steps=[
             "Identify the governing orbital equation.",
@@ -58,7 +59,8 @@ def test_reviewer_rejects_brief_draft() -> None:
     assert review.approved is False
     assert "The draft answer is too brief." in review.issues
     assert (
-        "Expand the answer with a clearer explanation."
+        "Expand the answer to at least three complete "
+        "sentences with a clear explanation."
         in review.revision_instructions
     )
 
@@ -155,9 +157,12 @@ def test_reviewer_accepts_acknowledged_requested_tool() -> None:
 
     draft = DraftAnswer(
         content=(
-            "The solution identifies the orbital equation and uses a "
-            "calculator to evaluate the numerical expression. It then "
-            "checks the units and explains the resulting velocity."
+            "The solution first identifies the governing orbital "
+            "equation and the values supplied by the problem. It uses "
+            "a calculator to evaluate the numerical expression and "
+            "checks that the resulting units represent velocity. "
+            "Finally, it explains what the calculated value means in "
+            "the physical context of the orbit."
         ),
         reasoning_steps=[
             "Identify the equation.",
@@ -187,3 +192,51 @@ def test_reviewer_rejects_blank_question() -> None:
             question="   ",
             draft=draft,
         )
+
+
+def test_reviewer_rejects_shallow_repetitive_answer() -> None:
+    reviewer = ReviewerAgent()
+
+    draft = DraftAnswer(
+        content=(
+            "The orbital velocity decreases as the orbital "
+            "radius increases. This decreases the velocity of "
+            "the object at the same time."
+        ),
+        reasoning_steps=[
+            "Identify the relevant concepts.",
+            "Explain the relationship.",
+            "State the conclusion.",
+        ],
+    )
+
+    review = reviewer.run(
+        question=(
+            "Why does orbital velocity decrease "
+            "as orbital radius increases?"
+        ),
+        draft=draft,
+    )
+
+    assert review.approved is False
+
+    assert (
+        "The draft answer is too brief."
+        in review.issues
+    )
+
+    assert (
+        "The draft contains too few complete sentences."
+        in review.issues
+    )
+
+    assert (
+        "Expand the answer to at least three complete "
+        "sentences with a clear explanation."
+        in review.revision_instructions
+    )
+
+    assert (
+        "Write at least three complete explanatory sentences."
+        in review.revision_instructions
+    )

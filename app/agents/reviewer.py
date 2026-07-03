@@ -1,5 +1,10 @@
+import re
+
 from app.models import DraftAnswer, ReviewResult
 
+
+MIN_WORD_COUNT = 35
+MIN_SENTENCE_COUNT = 3
 
 PLACEHOLDER_MARKERS = (
     "todo",
@@ -30,14 +35,33 @@ class ReviewerAgent:
         issues: list[str] = []
         revision_instructions: list[str] = []
 
-        word_count = len(draft.content.split())
+        cleaned_content = draft.content.strip()
+        lowered_content = cleaned_content.lower()
 
-        if word_count < 20:
+        word_count = len(cleaned_content.split())
+
+        if word_count < MIN_WORD_COUNT:
             issues.append(
                 "The draft answer is too brief."
             )
             revision_instructions.append(
-                "Expand the answer with a clearer explanation."
+                "Expand the answer to at least three complete "
+                "sentences with a clear explanation."
+            )
+
+        sentence_count = len(
+            re.findall(
+                r"[.!?](?:\s|$)",
+                cleaned_content,
+            )
+        )
+
+        if sentence_count < MIN_SENTENCE_COUNT:
+            issues.append(
+                "The draft contains too few complete sentences."
+            )
+            revision_instructions.append(
+                "Write at least three complete explanatory sentences."
             )
 
         if len(draft.reasoning_steps) < 3:
@@ -47,8 +71,6 @@ class ReviewerAgent:
             revision_instructions.append(
                 "Include at least three logical reasoning steps."
             )
-
-        lowered_content = draft.content.lower()
 
         if any(
             marker in lowered_content
