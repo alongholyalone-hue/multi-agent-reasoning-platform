@@ -185,8 +185,7 @@ class WorkflowOrchestrator:
                     "Produced an approved final answer."
                     if final_answer.approved
                     else (
-                        "Produced the best available answer "
-                        "with unresolved issues."
+                        "Produced a safe refusal with unresolved issues."
                     )
                 ),
             )
