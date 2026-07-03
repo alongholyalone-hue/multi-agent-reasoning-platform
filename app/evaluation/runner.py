@@ -3,6 +3,10 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from app.core import WorkflowOrchestrator
+from app.evaluation.scoring import (
+    AnswerRubric,
+    score_answer,
+)
 from app.models import TaskRequest
 
 
@@ -13,6 +17,7 @@ class EvaluationCase:
     case_id: str
     question: str
     max_revisions: int = 1
+    rubric: AnswerRubric | None = None
 
     def __post_init__(self) -> None:
         if not self.case_id.strip():
@@ -39,6 +44,9 @@ class EvaluationResult:
     final_answer: str
     issues: tuple[str, ...]
     event_count: int
+    benchmark_passed: bool | None = None
+    missing_concepts: tuple[str, ...] = ()
+    matched_forbidden_claims: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -50,6 +58,10 @@ class EvaluationSummary:
     approval_rate: float
     average_runtime_seconds: float
     total_revisions: int
+    benchmark_scored_count: int
+    benchmark_passed_count: int
+    benchmark_pass_rate: float
+    reviewer_false_positive_count: int
 
 
 def evaluate_cases(
@@ -77,6 +89,15 @@ def evaluate_cases(
             clock() - start_time,
         )
 
+        benchmark_score = (
+            score_answer(
+                answer=task_result.final_answer,
+                rubric=case.rubric,
+            )
+            if case.rubric is not None
+            else None
+        )
+
         results.append(
             EvaluationResult(
                 case_id=case.case_id,
@@ -87,6 +108,21 @@ def evaluate_cases(
                 final_answer=task_result.final_answer,
                 issues=tuple(task_result.review.issues),
                 event_count=len(task_result.events),
+                benchmark_passed=(
+                    benchmark_score.passed
+                    if benchmark_score is not None
+                    else None
+                ),
+                missing_concepts=(
+                    benchmark_score.missing_concepts
+                    if benchmark_score is not None
+                    else ()
+                ),
+                matched_forbidden_claims=(
+                    benchmark_score.matched_forbidden_claims
+                    if benchmark_score is not None
+                    else ()
+                ),
             )
         )
 
@@ -107,6 +143,10 @@ def summarize_results(
             approval_rate=0.0,
             average_runtime_seconds=0.0,
             total_revisions=0,
+            benchmark_scored_count=0,
+            benchmark_passed_count=0,
+            benchmark_pass_rate=0.0,
+            reviewer_false_positive_count=0,
         )
 
     approved_count = sum(
@@ -124,6 +164,31 @@ def summarize_results(
         for result in results
     )
 
+    scored_results = [
+        result
+        for result in results
+        if result.benchmark_passed is not None
+    ]
+
+    benchmark_scored_count = len(scored_results)
+
+    benchmark_passed_count = sum(
+        result.benchmark_passed is True
+        for result in scored_results
+    )
+
+    benchmark_pass_rate = (
+        benchmark_passed_count / benchmark_scored_count
+        if benchmark_scored_count
+        else 0.0
+    )
+
+    reviewer_false_positive_count = sum(
+        result.approved
+        and result.benchmark_passed is False
+        for result in scored_results
+    )
+
     return EvaluationSummary(
         case_count=case_count,
         approved_count=approved_count,
@@ -132,4 +197,10 @@ def summarize_results(
             total_runtime / case_count
         ),
         total_revisions=total_revisions,
+        benchmark_scored_count=benchmark_scored_count,
+        benchmark_passed_count=benchmark_passed_count,
+        benchmark_pass_rate=benchmark_pass_rate,
+        reviewer_false_positive_count=(
+            reviewer_false_positive_count
+        ),
     )

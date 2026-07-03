@@ -134,6 +134,22 @@ def main() -> None:
         f"Approval rate: "
         f"{summary.approval_rate:.1%}"
     )
+
+    if summary.benchmark_scored_count:
+        print(
+            f"Benchmark passed: "
+            f"{summary.benchmark_passed_count}/"
+            f"{summary.benchmark_scored_count}"
+        )
+        print(
+            f"Benchmark pass rate: "
+            f"{summary.benchmark_pass_rate:.1%}"
+        )
+        print(
+            f"Reviewer false positives: "
+            f"{summary.reviewer_false_positive_count}"
+        )
+
     print(
         f"Average runtime: "
         f"{summary.average_runtime_seconds:.2f} seconds"
