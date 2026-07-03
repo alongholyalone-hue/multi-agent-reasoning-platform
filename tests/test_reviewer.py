@@ -470,3 +470,29 @@ def test_reviewer_rejects_answer_ending_mid_sentence() -> None:
     # without spending another model-generation call.
     assert provider.calls == []
 
+def test_reviewer_rejects_approval_with_revision_instructions() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": '
+            '["Add another explanatory sentence."]}'
+        )
+    )
+
+    reviewer = ReviewerAgent(provider=provider)
+
+    review = reviewer.run(
+        question="Explain orbital velocity.",
+        draft=create_complete_draft(),
+    )
+
+    assert review.approved is False
+
+    assert review.issues == [
+        "The semantic reviewer rejected the draft."
+    ]
+
+    assert review.revision_instructions == [
+        "Add another explanatory sentence."
+    ]
+

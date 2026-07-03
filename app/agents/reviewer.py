@@ -302,7 +302,9 @@ class ReviewerAgent:
 
         # An answer cannot be approved while unresolved issues remain.
         normalized_approved = (
-            approved and not cleaned_issues
+            approved
+            and not cleaned_issues
+            and not cleaned_instructions
         )
 
         if not normalized_approved and not cleaned_issues:
