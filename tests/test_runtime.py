@@ -18,6 +18,11 @@ def test_runtime_injects_huggingface_provider() -> None:
         provider_mode="huggingface"
     )
 
+    assert (
+    orchestrator.reviewer.provider
+    is orchestrator.solver.provider
+    )
+
     assert isinstance(
         orchestrator.solver.provider,
         HuggingFaceText2TextProvider,
@@ -27,6 +32,11 @@ def test_runtime_injects_huggingface_provider() -> None:
 def test_runtime_injects_causal_provider() -> None:
     orchestrator = create_workflow_orchestrator(
         provider_mode="causal"
+    )
+
+    assert (
+    orchestrator.reviewer.provider
+    is orchestrator.solver.provider
     )
 
     assert isinstance(

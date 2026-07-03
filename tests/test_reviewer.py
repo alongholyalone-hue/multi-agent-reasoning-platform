@@ -2,6 +2,7 @@ import pytest
 
 from app.agents import ReviewerAgent
 from app.models import DraftAnswer, ReviewResult
+from app.providers import DeterministicModelProvider
 
 
 def create_complete_draft() -> DraftAnswer:
@@ -240,3 +241,101 @@ def test_reviewer_rejects_shallow_repetitive_answer() -> None:
         "Write at least three complete explanatory sentences."
         in review.revision_instructions
     )
+
+def test_reviewer_uses_semantic_provider_for_complete_draft() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": []}'
+        )
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    draft = create_complete_draft()
+
+    review = reviewer.run(
+        question="Explain orbital velocity.",
+        draft=draft,
+    )
+
+    assert review.approved is True
+    assert review.issues == []
+    assert len(provider.calls) == 1
+
+    call = provider.calls[0]
+
+    assert "Explain orbital velocity." in call.user_prompt
+    assert draft.content in call.user_prompt
+
+
+def test_semantic_reviewer_rejects_incorrect_answer() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": false, '
+            '"issues": ["The answer reverses the direction of '
+            'the gravitational relationship."], '
+            '"revision_instructions": ["Correct the causal '
+            'relationship between radius, gravity, and velocity."]}'
+        )
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    draft = DraftAnswer(
+        content=(
+            "Orbital velocity decreases as radius increases because "
+            "gravity becomes stronger farther from the central mass. "
+            "A stronger force then requires the object to move more "
+            "slowly around its orbit. Therefore, increasing distance "
+            "both strengthens gravity and lowers orbital speed."
+        ),
+        reasoning_steps=[
+            "Identify the governing forces.",
+            "Relate radius to gravity.",
+            "Explain the velocity change.",
+        ],
+    )
+
+    review = reviewer.run(
+        question=(
+            "Why does orbital velocity decrease "
+            "as orbital radius increases?"
+        ),
+        draft=draft,
+    )
+
+    assert review.approved is False
+    assert review.issues == [
+        "The answer reverses the direction of "
+        "the gravitational relationship."
+    ]
+
+    assert review.revision_instructions == [
+        "Correct the causal relationship between "
+        "radius, gravity, and velocity."
+    ]
+
+
+def test_semantic_reviewer_rejects_invalid_json() -> None:
+    provider = DeterministicModelProvider(
+        response="This answer appears correct."
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    review = reviewer.run(
+        question="Explain orbital velocity.",
+        draft=create_complete_draft(),
+    )
+
+    assert review.approved is False
+    assert review.issues == [
+        "The semantic reviewer returned an invalid response."
+    ]

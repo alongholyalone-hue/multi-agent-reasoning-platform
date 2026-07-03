@@ -1,4 +1,4 @@
-from app.agents import SolverAgent
+from app.agents import ReviewerAgent, SolverAgent
 from app.core.orchestrator import WorkflowOrchestrator
 from app.providers import create_model_provider
 
@@ -16,6 +16,11 @@ def create_workflow_orchestrator(
         provider=provider
     )
 
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
     return WorkflowOrchestrator(
-        solver=solver
+        solver=solver,
+        reviewer=reviewer,
     )
