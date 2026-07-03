@@ -7,3 +7,5 @@ htmlcov/
 .env
 .vscode/
 .DS_Store
+# Local evaluation reports
+artifacts/
