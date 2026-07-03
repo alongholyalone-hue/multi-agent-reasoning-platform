@@ -9,7 +9,7 @@ app = FastAPI(
         "A traceable multi-agent platform for planning, solving, "
         "reviewing, and revising technical problems."
     ),
-    version="0.2.0",
+    version="1.0.0",
 )
 
 app.include_router(tasks_router)
