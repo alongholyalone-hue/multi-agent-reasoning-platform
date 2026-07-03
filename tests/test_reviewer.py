@@ -339,3 +339,81 @@ def test_semantic_reviewer_rejects_invalid_json() -> None:
     assert review.issues == [
         "The semantic reviewer returned an invalid response."
     ]
+
+
+def test_reviewer_rejects_directional_contradiction() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": []}'
+        )
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    draft = DraftAnswer(
+        content=(
+            "Orbital velocity depends on gravitational attraction "
+            "and the distance from the central mass. As orbital "
+            "radius increases, the gravitational conditions needed "
+            "for circular motion change. Consequently, orbital "
+            "velocity must be increased to maintain the orbit. "
+            "This describes how objects move around a central body."
+        ),
+        reasoning_steps=[
+            "Identify the governing forces.",
+            "Relate radius to orbital motion.",
+            "Explain the velocity relationship.",
+        ],
+    )
+
+    review = reviewer.run(
+        question=(
+            "Why does orbital velocity decrease "
+            "as orbital radius increases?"
+        ),
+        draft=draft,
+    )
+
+    assert review.approved is False
+
+    assert (
+        "The draft contradicts the directional "
+        "relationship stated in the question."
+        in review.issues
+    )
+
+    assert (
+        "Remove statements that reverse or contradict "
+        "the relationship described in the question."
+        in review.revision_instructions
+    )
+
+    # The deterministic guard rejects the contradiction
+    # before calling the semantic model.
+    assert provider.calls == []
+
+
+def test_semantic_reviewer_rejects_wrong_json_types() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": "No changes needed."}'
+        )
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    review = reviewer.run(
+        question="Explain orbital velocity.",
+        draft=create_complete_draft(),
+    )
+
+    assert review.approved is False
+    assert review.issues == [
+        "The semantic reviewer returned an invalid response."
+    ]

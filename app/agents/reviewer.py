@@ -17,6 +17,17 @@ PLACEHOLDER_MARKERS = (
     "finish later",
 )
 
+DIRECTIONAL_QUESTION_PATTERN = re.compile(
+    r"why\s+does\s+"
+    r"(?P<subject>.+?)\s+"
+    r"(?P<subject_direction>increase|decrease)\s+"
+    r"as\s+"
+    r"(?P<condition>.+?)\s+"
+    r"(?P<condition_direction>increases?|decreases?)"
+    r"\??$",
+    re.IGNORECASE,
+)
+
 
 class ReviewerAgent:
     """Evaluate draft answers using deterministic and semantic checks."""
@@ -95,6 +106,23 @@ class ReviewerAgent:
                 "Replace all placeholder text with complete content."
             )
 
+        directional_conflict = (
+            self._find_directional_conflict(
+                question=cleaned_question,
+                content=cleaned_content,
+            )
+        )
+
+        if directional_conflict is not None:
+            issues.append(
+                "The draft contradicts the directional "
+                "relationship stated in the question."
+            )
+            revision_instructions.append(
+                "Remove statements that reverse or contradict "
+                "the relationship described in the question."
+            )
+
         missing_tools = [
             tool
             for tool in draft.requested_tools
@@ -171,8 +199,12 @@ class ReviewerAgent:
             "Do not approve an answer merely because it is long. "
             "Return only valid JSON with exactly these keys: "
             '"approved", "issues", and "revision_instructions". '
-            '"approved" must be a boolean. The other two values must '
-            "be arrays of strings."
+            '"approved" must be a boolean. "issues" and '
+            '"revision_instructions" must always be arrays of strings. '
+            "Never return a single string instead of an array. "
+            "For an approved answer, return exactly this structure: "
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": []}.'
         )
 
     @staticmethod
@@ -284,7 +316,119 @@ class ReviewerAgent:
         )
 
     @staticmethod
+    def _find_directional_conflict(
+        *,
+        question: str,
+        content: str,
+    ) -> str | None:
+        """
+        Detect when the answer directly reverses the direction
+        of the subject relationship stated in the question.
+        """
+
+        match = DIRECTIONAL_QUESTION_PATTERN.search(
+            question.strip()
+        )
+
+        if match is None:
+            return None
+
+        subject = match.group("subject").strip()
+
+        expected_direction = match.group(
+            "subject_direction"
+        ).lower()
+
+        subject_tokens = re.findall(
+            r"[a-z0-9]+",
+            subject.lower(),
+        )
+
+        if not subject_tokens:
+            return None
+
+        subject_pattern = r"\s+".join(
+            re.escape(token)
+            for token in subject_tokens
+        )
+
+        if expected_direction == "decrease":
+            expected_words = (
+                r"decrease|decreases|decreased|decreasing"
+            )
+            conflicting_words = (
+                r"increase|increases|increased|increasing"
+            )
+        else:
+            expected_words = (
+                r"increase|increases|increased|increasing"
+            )
+            conflicting_words = (
+                r"decrease|decreases|decreased|decreasing"
+            )
+
+        expected_pattern = re.compile(
+            rf"\b(?:{expected_words})\b",
+            re.IGNORECASE,
+        )
+
+        relationship_pattern = re.compile(
+            rf"\b{subject_pattern}\b"
+            rf"(?P<middle>.{{0,80}}?)"
+            rf"\b(?P<conflict>{conflicting_words})\b",
+            re.IGNORECASE,
+        )
+
+        sentences = re.split(
+            r"(?<=[.!?])\s+",
+            content.strip(),
+        )
+
+        for sentence in sentences:
+            relationship_match = (
+                relationship_pattern.search(sentence)
+            )
+
+            if relationship_match is None:
+                continue
+
+            middle_text = relationship_match.group(
+                "middle"
+            )
+
+            # Do not reject an echoed relationship such as:
+            # "orbital velocity decreases as radius increases."
+            if expected_pattern.search(middle_text):
+                continue
+
+            preceding_text = middle_text[-30:]
+
+            if ReviewerAgent._contains_negation(
+                preceding_text
+            ):
+                continue
+
+            return sentence.strip()
+
+        return None
+
+    @staticmethod
+    def _contains_negation(text: str) -> bool:
+        """Return whether nearby text negates a directional verb."""
+
+        return bool(
+            re.search(
+                r"\b(?:not|never|cannot|can't|"
+                r"doesn't|does\s+not)\b",
+                text,
+                re.IGNORECASE,
+            )
+        )
+
+    @staticmethod
     def _is_string_list(value: Any) -> bool:
+        """Return whether a value is a list containing only strings."""
+
         return (
             isinstance(value, list)
             and all(
