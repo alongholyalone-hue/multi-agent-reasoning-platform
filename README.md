@@ -1,3 +1,19 @@
+## Interactive Interface
+
+The project includes a Streamlit interface for submitting questions and inspecting the complete multi-agent workflow.
+
+![Streamlit interface demonstration](docs/images/streamlit-demo.png)
+
+The interface presents:
+
+- The generated final answer
+- Reviewer approval or safe-refusal status
+- Runtime and revision count
+- The Planner’s reasoning steps
+- Reviewer issues and revision instructions
+- A chronological agent execution trace
+- The complete structured response
+
 # Multi-Agent Reasoning Platform
 
 A traceable multi-agent system for planning, solving, reviewing, revising, and evaluating technical answers.
@@ -69,7 +85,8 @@ app/
 ├── models/          Typed request and workflow models
 ├── providers/       Deterministic and Hugging Face providers
 ├── tools/           Extension point for future tools
-└── main.py          FastAPI application
+├── main.py          FastAPI application
+└── streamlit_app.py     Interactive user-facing workflow interface
 
 scripts/
 └── evaluate_provider.py
@@ -100,6 +117,33 @@ Install dependencies:
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+## Running the Streamlit Interface
+
+Start the user-facing interface in scaffold mode:
+
+```bash
+MODEL_PROVIDER=scaffold streamlit run streamlit_app.py
+```
+
+To run it with the local causal model:
+
+```bash
+export MODEL_PROVIDER=causal
+export CAUSAL_MODEL_NAME=Qwen/Qwen2.5-0.5B-Instruct
+export CAUSAL_MAX_NEW_TOKENS=256
+export CAUSAL_DEVICE=-1
+
+streamlit run streamlit_app.py
+```
+
+Then open:
+
+```text
+http://localhost:8501
+```
+
+Scaffold mode demonstrates the workflow quickly but does not generate genuine answers. Causal mode uses the configured local language model and may take several minutes on a CPU.
 
 ## Running the API
 
