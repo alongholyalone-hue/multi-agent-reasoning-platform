@@ -417,3 +417,56 @@ def test_semantic_reviewer_rejects_wrong_json_types() -> None:
     assert review.issues == [
         "The semantic reviewer returned an invalid response."
     ]
+
+def test_reviewer_rejects_answer_ending_mid_sentence() -> None:
+    provider = DeterministicModelProvider(
+        response=(
+            '{"approved": true, "issues": [], '
+            '"revision_instructions": []}'
+        )
+    )
+
+    reviewer = ReviewerAgent(
+        provider=provider
+    )
+
+    draft = DraftAnswer(
+        content=(
+            "Electrical current depends on voltage and resistance "
+            "in a circuit. Ohm's law states that current equals "
+            "voltage divided by resistance. At constant voltage, "
+            "a larger denominator produces a smaller current. "
+            "Therefore, increasing resistance causes the current to"
+        ),
+        reasoning_steps=[
+            "Identify Ohm's law.",
+            "Hold voltage constant.",
+            "Explain the inverse relationship.",
+        ],
+    )
+
+    review = reviewer.run(
+        question=(
+            "Why does increasing electrical resistance decrease "
+            "current when voltage remains constant?"
+        ),
+        draft=draft,
+    )
+
+    assert review.approved is False
+
+    assert (
+        "The draft appears to end mid-sentence."
+        in review.issues
+    )
+
+    assert (
+        "Complete the final sentence and end the answer "
+        "with a clear conclusion."
+        in review.revision_instructions
+    )
+
+    # The deterministic guard should reject the truncated answer
+    # without spending another model-generation call.
+    assert provider.calls == []
+

@@ -106,6 +106,15 @@ class ReviewerAgent:
                 "Replace all placeholder text with complete content."
             )
 
+        if self._appears_truncated(cleaned_content):
+            issues.append(
+                "The draft appears to end mid-sentence."
+            )
+            revision_instructions.append(
+                "Complete the final sentence and end the answer "
+                "with a clear conclusion."
+            )
+
         directional_conflict = (
             self._find_directional_conflict(
                 question=cleaned_question,
@@ -313,6 +322,37 @@ class ReviewerAgent:
             approved=normalized_approved,
             issues=cleaned_issues,
             revision_instructions=cleaned_instructions,
+        )
+
+    @staticmethod
+    def _appears_truncated(content: str) -> bool:
+        """Return whether an answer appears to end mid-sentence."""
+
+        stripped_content = content.rstrip()
+
+        if not stripped_content:
+            return True
+
+        closing_characters = (
+            '"',
+            "'",
+            "”",
+            "’",
+            ")",
+            "]",
+            "}",
+            "`",
+            "*",
+        )
+
+        while (
+            stripped_content
+            and stripped_content[-1] in closing_characters
+        ):
+            stripped_content = stripped_content[:-1].rstrip()
+
+        return not stripped_content.endswith(
+            (".", "!", "?", "…")
         )
 
     @staticmethod
