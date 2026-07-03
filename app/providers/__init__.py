@@ -11,8 +11,15 @@ from app.providers.huggingface import (
     DEFAULT_MODEL_NAME,
     HuggingFaceText2TextProvider,
 )
+from app.providers.causal import (
+    DEFAULT_CAUSAL_MODEL_NAME,
+    HuggingFaceCausalProvider,
+)
+
 
 __all__ = [
+    "DEFAULT_CAUSAL_MODEL_NAME",
+    "HuggingFaceCausalProvider",
     "DEFAULT_MODEL_NAME",
     "DEFAULT_PROVIDER_MODE",
     "DeterministicModelProvider",
